@@ -4,6 +4,9 @@ import os
 from flask import Flask, redirect, request, session, url_for, render_template
 #from classes import db
 from classes import EagleEye as ee
+from pydub import AudioSegment
+import librosa
+import numpy as np
 
 
 load_dotenv()
@@ -58,14 +61,47 @@ def profile():
     user_profile = spotify.get_user()
     return f"User profile: {user_profile}"
 
+@app.route('/submit-song', methods=['POST'])
+def submit_song():
+    file = request.files['song']
+    if file:
+        # Save the uploaded file
+        filepath = './uploaded_song'
+        file.save(filepath)
+
+        # Convert the audio file to WAV format if necessary
+        audio = AudioSegment.from_file(filepath)
+        wav_filepath = filepath + '.wav'
+        audio.export(wav_filepath, format='wav')
+
+        # Load the audio file
+        y, sr = librosa.load(wav_filepath)
+
+        # Extract features
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        danceability = np.mean(librosa.feature.tempogram(y=y, sr=sr))
+        energy = np.mean(librosa.feature.rms(y=y))
+
+        # Clean up temporary files
+        os.remove(filepath)
+        os.remove(wav_filepath)
+
+        # Create a summary of the extracted features
+        features = {
+            'tempo': tempo,
+            'danceability': danceability,
+            'energy': energy
+        }
+    return render_template('home.html', data=features)
+
 @app.route('/home')
 def home():
-    EagleEye = train_model()
+    #EagleEye = train_model()
 
     # TODO: Create an input and button to upload a new song to predict the popularity of the song
     # TODO: Process the uploaded song and gather the X features of the song to pass into the predict function
-    X_data = EagleEye.process_song()
-    EagleEye.predict(X_data)
+    #X_data = EagleEye.process_song()
+    #EagleEye.predict(X_data)
     # TODO: Create a table to display the predictions of the songs and the information about the songs (tempo, danceability, etc.)
 
     data = "<p>Some placeholder text</p>"

@@ -11,7 +11,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.externals import joblib
+import joblib
 
 
 class EagleEye:
