@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <title>{% block title %}{% endblock %} - Eagle Eye</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!--<link rel="stylesheet" href="{{ url_for('static', filename='tailwindcss/output.css') }}">-->
+  </head>
+  <body class="bg-gray-100 flex h-screen">
+  
+    <!-- Navigation Bar -->
+    <nav class="w-64 bg-white shadow-md h-full p-4">
+      <ul class="space-y-4">
+        <li>
+          <a href="#" class="block py-2 px-4 rounded hover:bg-gray-200">Dashboard</a>
+        </li>
+        <li>
+          <a href="#" class="block py-2 px-4 rounded hover:bg-gray-200">Settings</a>
+        </li>
+        <li>
+          <a href="#" class="block py-2 px-4 rounded hover:bg-gray-200">Profile</a>
+        </li>
+        <li>
+          <a href="#" class="block py-2 px-4 rounded hover:bg-gray-200">Logout</a>
+        </li>
+      </ul>
+    </nav>
+    
+    <!-- Main Content -->
+    <div class="flex-grow p-4">
+    <section class="content">
+      <!--<header>-->
+        {% block header %}{% endblock %}
+      <!--</header>-->
+      {% for message in get_flashed_messages() %}
+        <div class="flash">{{ message }}</div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </section>
+    </div>
+  
+  </body>
+
+</html>

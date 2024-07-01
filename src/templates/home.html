@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1 class="text-2xl font-bold mb-4">{% block title %}Eagle Eye{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  {{ data|safe }}
+{% endblock %}
