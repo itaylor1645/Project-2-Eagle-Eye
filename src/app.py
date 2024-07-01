@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 from flask import Flask, redirect, request, session, url_for, render_template
 #from classes import db
-from classes import EagleEye as ee
+from classes.EagleEye import EagleEye
 from pydub import AudioSegment
 import librosa
 import numpy as np
@@ -27,7 +27,7 @@ app.secret_key = os.urandom(24)  # For session management
 spotify = SpotifyClient()
 
 def train_model():
-    EagleEye = ee.EagleEye("../Resources/uncleaned_data.csv")
+    EagleEye = EagleEye("../Resources/uncleaned_data.csv")
     EagleEye.train_model()
     return EagleEye
 
@@ -69,30 +69,11 @@ def submit_song():
         filepath = './uploaded_song'
         file.save(filepath)
 
-        # Convert the audio file to WAV format if necessary
-        audio = AudioSegment.from_file(filepath)
-        wav_filepath = filepath + '.wav'
-        audio.export(wav_filepath, format='wav')
+        # Analyze the audio file
+        eagleEye = EagleEye()
+        metrics = eagleEye.analyze_audio(filepath)
 
-        # Load the audio file
-        y, sr = librosa.load(wav_filepath)
-
-        # Extract features
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        danceability = np.mean(librosa.feature.tempogram(y=y, sr=sr))
-        energy = np.mean(librosa.feature.rms(y=y))
-
-        # Clean up temporary files
-        os.remove(filepath)
-        os.remove(wav_filepath)
-
-        # Create a summary of the extracted features
-        features = {
-            'tempo': tempo,
-            'danceability': danceability,
-            'energy': energy
-        }
-    return render_template('home.html', data=features)
+    return render_template('home.html', data=metrics)
 
 @app.route('/home')
 def home():
