@@ -2,11 +2,7 @@ from classes.SpotifyClient import SpotifyClient
 from dotenv import load_dotenv
 import os
 from flask import Flask, redirect, request, session, url_for, render_template
-#from classes import db
 from classes.EagleEye import EagleEye
-from pydub import AudioSegment
-import librosa
-import numpy as np
 
 
 load_dotenv()
@@ -15,7 +11,6 @@ app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config.from_mapping(
     SECRET_KEY='dev',
     TEMPLATES_AUTO_RELOAD=True,
-    DATABASE=os.path.join(app.instance_path, 'flaskr.sqlite'),
 )
 
 app.secret_key = os.urandom(24)  # For session management
@@ -33,7 +28,11 @@ def train_model():
 
 @app.route('/')
 def index():
-    # Redirect user to Spotify authorization URL
+    # Check if spotify api key is in the .env file
+    if os.environ.get('SPOTIFY_CLIENT_ID') is None or os.environ.get('SPOTIFY_CLIENT_SECRET') is None:
+        return redirect('/home')
+    
+    # If spotify API token is configured redirect user to Spotify authorization URL
     return redirect(spotify.OAuth.get_authorize_url())
 
 @app.route('/callback')
@@ -81,7 +80,7 @@ def home():
 
     # TODO: Create an input and button to upload a new song to predict the popularity of the song
     # TODO: Process the uploaded song and gather the X features of the song to pass into the predict function
-    #X_data = EagleEye.process_song()
+    #X_data = EagleEye.analyze_audio(filepath)
     #EagleEye.predict(X_data)
     # TODO: Create a table to display the predictions of the songs and the information about the songs (tempo, danceability, etc.)
 
