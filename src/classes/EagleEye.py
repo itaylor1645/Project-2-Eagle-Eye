@@ -45,7 +45,15 @@ class EagleEye:
       loudness = np.mean(librosa.feature.rms(y=y))  # Approximation
       key = librosa.feature.chroma_stft(y=y, sr=sr)
       key = np.argmax(np.mean(key, axis=1))
-      speechiness = np.mean(librosa.feature.mfcc(y=y, sr=sr))  # Approximation
+      mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+      speechiness = np.mean(mfccs)  # Approximation
+      chroma_stft = librosa.feature.chroma_stft(y=y, sr=sr)
+      spectral_contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
+      zero_crossing_rate = librosa.feature.zero_crossing_rate(y)
+      rms = librosa.feature.rms(y=y)
+
+      danceability = np.mean(zero_crossing_rate) * np.mean(rms) * tempo
+      energy = np.mean(rms) * tempo
 
       # Acousticness, instrumentalness, liveness, valence are typically Spotify-specific
       # so, let's use dummy values here and later replace with actual API calls
@@ -69,7 +77,9 @@ class EagleEye:
           "instrumentalness": instrumentalness,
           "liveness": liveness,
           "valence": valence,
-          "time_signature": time_signature
+          "time_signature": time_signature,
+          "danceability": danceability,
+          "energy": energy
       }
 
 
