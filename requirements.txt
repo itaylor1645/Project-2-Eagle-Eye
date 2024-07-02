@@ -1,0 +1,7 @@
+spotipy
+pandas
+scikit-learn
+flask
+joblib
+librosa
+pydub
