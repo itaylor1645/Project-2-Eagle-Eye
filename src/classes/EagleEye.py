@@ -18,9 +18,9 @@ from pydub import AudioSegment
 
 
 class EagleEye:
-    def __init__(self, csv_file=None):
+    def __init__(self, csv_file=None, target='y'):
         if csv_file:
-          self.load_csv(csv_file)
+          self.load_csv(csv_file, target)
 
     def convert_audio(self, file_path):
         # Convert the audio file to WAV format if necessary
@@ -83,8 +83,10 @@ class EagleEye:
       }
 
 
-    def load_csv(self, csv_file):
+    def load_csv(self, csv_file, target='y'):
         self.data = pd.read_csv(csv_file)
+        self.data.rename(columns={target: 'y'}, inplace=True)
+        self.split_data()
 
     def clean_data(self):
         self.data = self.data.dropna()
@@ -93,33 +95,50 @@ class EagleEye:
     def get_data(self):
         return self.data
     
-    def split_data(self):
-        self.X = self.data.drop('target', axis=1)
-        self.y = self.data['target']
+    def split_data(self, target='y'):
+        print("Splitting data...")
+        self.X = self.data.drop(target, axis=1)
+        self.y = self.data[target]
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=0)
 
     def train_model(self):
         # Check if the model.pkl file exists if it does then load the model, if it doesnt then train the model
-        try:
+        print("Training model...")
+        if os.path.exists('model.pkl'):
             self.model = joblib.load('model.pkl')
-        except:
-          if not hasattr(self, 'X_train'):
-              self.split_data()
-          self.model = make_pipeline(StandardScaler(), RandomForestClassifier())
+        else:
+          self.model = RandomForestClassifier()
           self.model.fit(self.X_train, self.y_train)
           joblib.dump(self.model, 'model.pkl')
 
-    def predict(self, X_data):
+    def predict(self, X_data=None):
+        if not X_data:
+            X_data = self.X_test
         return self.model.predict(X_data)
 
     def evaluate_model(self):
-        self.y_pred = self.model.predict(self.X_test)
+        print("Evaluating model...")
+        print("Making predictions...")
+        self.y_pred = self.predict()
         self.accuracy = accuracy_score(self.y_test, self.y_pred)
         self.cross_val_score = cross_val_score(self.model, self.X, self.y, cv=5)
         self.classification_report = classification_report(self.y_test, self.y_pred)
         self.confusion_matrix = confusion_matrix(self.y_test, self.y_pred)
         self.roc_auc_score = roc_auc_score(self.y_test, self.y_pred)
         self.fpr, self.tpr, self.thresholds = roc_curve(self.y_test, self.y_pred)
+
+        return {
+            "accuracy": self.accuracy,
+            "cross_val_score": self.cross_val_score,
+            "classification_report": self.classification_report,
+            "confusion_matrix": self.confusion_matrix,
+            "roc_auc_score": self.roc_auc_score,
+            "roc_curve": {
+                "fpr": self.fpr,
+                "tpr": self.tpr,
+                "thresholds": self.thresholds
+            }
+        }
 
     def plot_roc_curve(self):
         plt.plot(self.fpr, self.tpr, marker='.')
