@@ -1,14 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import roc_curve
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 import librosa
 import numpy as np
@@ -86,6 +79,7 @@ class EagleEye:
     def load_csv(self, csv_file, target='y'):
         self.data = pd.read_csv(csv_file)
         self.data.rename(columns={target: 'y'}, inplace=True)
+        self.data['y'] = self.data['y'].astype(float)
         self.split_data()
 
     def clean_data(self):
@@ -107,7 +101,7 @@ class EagleEye:
         if os.path.exists('model.pkl'):
             self.model = joblib.load('model.pkl')
         else:
-          self.model = RandomForestClassifier()
+          self.model = RandomForestRegressor()
           self.model.fit(self.X_train, self.y_train)
           joblib.dump(self.model, 'model.pkl')
 
@@ -120,24 +114,17 @@ class EagleEye:
         print("Evaluating model...")
         print("Making predictions...")
         self.y_pred = self.predict()
-        self.accuracy = accuracy_score(self.y_test, self.y_pred)
-        self.cross_val_score = cross_val_score(self.model, self.X, self.y, cv=5)
-        self.classification_report = classification_report(self.y_test, self.y_pred)
-        self.confusion_matrix = confusion_matrix(self.y_test, self.y_pred)
-        self.roc_auc_score = roc_auc_score(self.y_test, self.y_pred)
-        self.fpr, self.tpr, self.thresholds = roc_curve(self.y_test, self.y_pred)
+        print("Calculating mean_squared_error...")
+        self.mean_squared_error = mean_squared_error(self.y_test, self.y_pred)
+        print("Calculating mean_absolute_error...")
+        self.mean_absolute_error = mean_absolute_error(self.y_test, self.y_pred)
+        print("Calculating r2_score...")
+        self.r2_score = r2_score(self.y_test, self.y_pred)
 
         return {
-            "accuracy": self.accuracy,
-            "cross_val_score": self.cross_val_score,
-            "classification_report": self.classification_report,
-            "confusion_matrix": self.confusion_matrix,
-            "roc_auc_score": self.roc_auc_score,
-            "roc_curve": {
-                "fpr": self.fpr,
-                "tpr": self.tpr,
-                "thresholds": self.thresholds
-            }
+            "mean_squared_error": self.mean_squared_error,
+            "mean_absolute_error": self.mean_absolute_error,
+            "r2_score": self.r2_score,
         }
 
     def plot_roc_curve(self):
