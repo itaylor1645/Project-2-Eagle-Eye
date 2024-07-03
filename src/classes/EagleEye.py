@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 import librosa
@@ -79,7 +79,7 @@ class EagleEye:
     def load_csv(self, csv_file, target='y'):
         self.data = pd.read_csv(csv_file)
         self.data.rename(columns={target: 'y'}, inplace=True)
-        self.data['y'] = self.data['y'].astype(float)
+        self.data['y'] = self.label_encode(self.data['y'])
         self.split_data()
 
     def clean_data(self):
@@ -93,39 +93,75 @@ class EagleEye:
         print("Splitting data...")
         self.X = self.data.drop(target, axis=1)
         self.y = self.data[target]
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=0)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, random_state=42)
 
-    def train_model(self):
+    def train_randomforest_model(self):
         # Check if the model.pkl file exists if it does then load the model, if it doesnt then train the model
         print("Training model...")
-        if os.path.exists('model.pkl'):
-            self.model = joblib.load('model.pkl')
-        else:
-          self.model = RandomForestRegressor()
-          self.model.fit(self.X_train, self.y_train)
-          joblib.dump(self.model, 'model.pkl')
+        # if os.path.exists('model.pkl'):
+        #     self.model = joblib.load('model.pkl')
+        # else:
+        self.model = RandomForestClassifier()
+        self.model.fit(self.X_train, self.y_train)
+        #joblib.dump(self.model, 'model.pkl')
+
+    def train_xgboost_model(self):
+        from xgboost import XGBClassifier
+        self.y_train = self.label_encode(self.y_train)
+        self.model = XGBClassifier()
+        self.model.fit(self.X_train, self.y_train)
+
+    def train_knn_model(self):
+        from sklearn.neighbors import KNeighborsClassifier
+        self.model = KNeighborsClassifier()
+        self.model.fit(self.X_train, self.y_train)
+
+    def train_svm_model(self):
+        from sklearn.svm import SVC
+        self.model = SVC()
+        self.model.fit(self.X_train, self.y_train)
+    
+    def train_logistic_regression_model(self):
+        from sklearn.linear_model import LogisticRegression
+        self.model = LogisticRegression()
+        self.model.fit(self.X_train, self.y_train)
 
     def predict(self, X_data=None):
-        if not X_data:
+        if X_data is None:
             X_data = self.X_test
         return self.model.predict(X_data)
+    
+    def label_encode(self, y):
+        from sklearn.preprocessing import LabelEncoder
+        le = LabelEncoder()
+        return le.fit_transform(y)
+    
+    def get_accuracy_metrics(self, y, y_pred):
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+        accuracy = accuracy_score(y, y_pred)
+        precision = precision_score(y, y_pred, average='weighted')
+        recall = recall_score(y, y_pred, average='weighted')
+        f1 = f1_score(y, y_pred, average='weighted')
+        #classification_report = classification_report( y, y_pred )
+
+        return {
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+#            "classification_report": classification_report, 
+        }
 
     def evaluate_model(self):
         print("Evaluating model...")
         print("Making predictions...")
-        self.y_pred = self.predict()
-        print("Calculating mean_squared_error...")
-        self.mean_squared_error = mean_squared_error(self.y_test, self.y_pred)
-        print("Calculating mean_absolute_error...")
-        self.mean_absolute_error = mean_absolute_error(self.y_test, self.y_pred)
-        print("Calculating r2_score...")
-        self.r2_score = r2_score(self.y_test, self.y_pred)
+        self.y_pred_test = self.predict(self.X_test)
+        self.y_pred_train = self.predict(self.X_train)
+        print("Getting accuracy metrics...")
 
-        return {
-            "mean_squared_error": self.mean_squared_error,
-            "mean_absolute_error": self.mean_absolute_error,
-            "r2_score": self.r2_score,
-        }
+        evaluation = { "Test Data Scores": self.get_accuracy_metrics(self.y_test, self.y_pred_test), "Train Data Scores": self.get_accuracy_metrics(self.y_train, self.y_pred_train)}
+        print(f"--- Test Data Scores ---\n {evaluation["Test Data Scores"]}")
+        print(f"--- Train Data Scores ---\n {evaluation["Train Data Scores"]}")
 
     def plot_roc_curve(self):
         plt.plot(self.fpr, self.tpr, marker='.')
