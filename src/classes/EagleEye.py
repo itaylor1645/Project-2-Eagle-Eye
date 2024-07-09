@@ -126,21 +126,15 @@ class EagleEye:
             smote = SMOTE(random_state=42)
             self.X_train, self.y_train = smote.fit_resample(self.X_train, self.y_train)
 
-    def train_randomforest_model(self, perform_random_search=True, remove_old_model=True):
-        # Check if the model.pkl file exists; if it does, then load the model; if it doesn't, then train the model
-
-        # Delete old model file if remove_old_model is set to True
-        if remove_old_model:
-            if os.path.exists('model.pkl'):
-                os.remove('model.pkl')
-                print("Deleted existing model.pkl")
-
+    def train_randomforest_model(self, perform_random_search=True, retrain_model=True):
         # Load model if it is already trained and exists
-        if os.path.exists('model.pkl') and not perform_random_search:
+        if not retrain_model and os.path.exists('model.pkl') and not perform_random_search:
             self.model = joblib.load('model.pkl')
             print("Model loaded from model.pkl")
         else:
             self.model = RandomForestClassifier()
+
+            # Perform RandomizedSearchCV to find the best hyperparameters
             if perform_random_search:
                 param_dist = {
                     'n_estimators': [100, 200, 300],
@@ -159,10 +153,14 @@ class EagleEye:
                 print(f"Best Params: {best_params}")
                 joblib.dump(self.model, 'model.pkl')
                 print("Model saved to model.pkl")
+
+            # Train with default parameters if RandomizedSearchCV is disabled
             else:
                 # Train with default parameters
                 print("Training model...")
                 self.model.fit(self.X_train, self.y_train)
+
+                # Save the model to disk as model.pkl so that we dont have to train it upon every run. 
                 joblib.dump(self.model, 'model.pkl')
                 print("Default model trained and saved to model.pkl")
 
