@@ -88,13 +88,6 @@ class EagleEye:
         self.remove_outliers_by_zscore(self.X_train.columns.tolist())
         self.sample_data()
 
-    def clean_data(self):
-        self.data = self.data.dropna()
-        self.data = self.data.drop_duplicates
-
-    def get_data(self):
-        return self.data
-    
     def split_data(self, target='y'):
         print("Splitting data...")
         self.X = self.data.drop(target, axis=1)
@@ -135,14 +128,14 @@ class EagleEye:
 
     def train_randomforest_model(self, perform_random_search=True, remove_old_model=True):
         # Check if the model.pkl file exists; if it does, then load the model; if it doesn't, then train the model
-        print("Training model...")
+
+        # Delete old model file if remove_old_model is set to True
         if remove_old_model:
             if os.path.exists('model.pkl'):
-                self.model = joblib.load('model.pkl')
-                print("Model loaded from model.pkl")
                 os.remove('model.pkl')
                 print("Deleted existing model.pkl")
 
+        # Load model if it is already trained and exists
         if os.path.exists('model.pkl') and not perform_random_search:
             self.model = joblib.load('model.pkl')
             print("Model loaded from model.pkl")
@@ -168,6 +161,7 @@ class EagleEye:
                 print("Model saved to model.pkl")
             else:
                 # Train with default parameters
+                print("Training model...")
                 self.model.fit(self.X_train, self.y_train)
                 joblib.dump(self.model, 'model.pkl')
                 print("Default model trained and saved to model.pkl")
