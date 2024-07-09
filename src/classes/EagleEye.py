@@ -1,7 +1,10 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import classification_report
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from sklearn.model_selection import RandomizedSearchCV
 import matplotlib.pyplot as plt
 import librosa
 import numpy as np
@@ -81,29 +84,91 @@ class EagleEye:
         self.data.rename(columns={target: 'y'}, inplace=True)
         self.data['y'] = self.label_encode(self.data['y'])
         self.split_data()
+        self.remove_outliers_by_zscore(self.X_train.columns.tolist())
+        self.sample_data()
 
-    def clean_data(self):
-        self.data = self.data.dropna()
-        self.data = self.data.drop_duplicates
-
-    def get_data(self):
-        return self.data
-    
     def split_data(self, target='y'):
         print("Splitting data...")
         self.X = self.data.drop(target, axis=1)
         self.y = self.data[target]
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, random_state=42)
 
-    def train_randomforest_model(self):
-        # Check if the model.pkl file exists if it does then load the model, if it doesnt then train the model
-        print("Training model...")
-        # if os.path.exists('model.pkl'):
-        #     self.model = joblib.load('model.pkl')
-        # else:
-        self.model = RandomForestClassifier()
-        self.model.fit(self.X_train, self.y_train)
-        #joblib.dump(self.model, 'model.pkl')
+    def remove_outliers_by_zscore(self, features, zscore_threshold=3, enabled=True):
+        if enabled:
+            print(f"Removing outliers from the training set based on a zscore tolerance of {zscore_threshold}...")   
+            # Identify outliers based on Z-score threshold for X_train
+            z_scores = np.abs((self.X_train[features] - self.X_train[features].mean()) / self.X_train[features].std()) 
+            outlier_mask_X = (z_scores > zscore_threshold).any(axis=1)
+            self.X_train = self.X_train[~outlier_mask_X]
+            self.y_train = self.y_train[~outlier_mask_X]
+        else:
+            print("Outlier removal is disabled. Skipping...")
+
+    def sample_data(self, undersample=False):
+        if undersample:
+            print("Undersampling Data...")
+            train_data = pd.concat([self.X_train, self.y_train], axis=1)
+            min_class_size = train_data['y'].value_counts().min()
+            
+            if min_class_size <= 1:
+                # Handle case where minimum class size is too small to sample
+                print("Warning: Minimum class size is too small for undersampling.")
+                return
+            
+            rus = RandomUnderSampler(sampling_strategy='auto', random_state=1)
+            try:
+                self.X_train, self.y_train = rus.fit_resample(self.X_train, self.y_train)
+            except Exception as e:
+                print(f"Error during undersampling: {e}")
+        else:
+            print("Synthetic Minority Oversampling Technique (SMOTE)")
+            smote = SMOTE(random_state=42)
+            self.X_train, self.y_train = smote.fit_resample(self.X_train, self.y_train)
+
+    def train_randomforest_model(self, perform_random_search=True, retrain_model=True):
+        # Load model if it is already trained and exists
+        if not retrain_model and os.path.exists('model.pkl') and not perform_random_search:
+            self.load_model('model.pkl')
+        else:
+            # Train a new model
+            print("Training Random Forest model...")
+            self.model = RandomForestClassifier()
+
+            # Perform RandomizedSearchCV to find the best hyperparameters
+            if perform_random_search:
+                
+                param_dist = {
+                    'n_estimators': [100, 200, 300],
+                    'max_depth': [None, 10, 20, 30],
+                    'min_samples_split': [2, 5, 10],
+                    'min_samples_leaf': [1, 2, 4],
+                    'bootstrap': [True, False]
+                }
+                # Create a RandomizedSearchCV object
+                print("Finding best parameters...")
+                random_search = RandomizedSearchCV(estimator=self.model, param_distributions=param_dist,
+                                                n_iter=100, cv=3, n_jobs=-1, verbose=2, random_state=42)
+                random_search.fit(self.X_train, self.y_train)
+                self.model = random_search.best_estimator_
+                best_params = random_search.best_params_
+                print(f"Best Params: {best_params}")
+
+            else:
+                
+                # Train with default parameters if RandomizedSearchCV is disabled
+                print("Training model...")
+                self.model.fit(self.X_train, self.y_train)
+
+            # Save the model to disk as model.pkl so that we dont have to train it upon every run. 
+            self.save_model("model.pkl")
+
+    def save_model(self, model_name='model.pkl'):
+        joblib.dump(self.model, model_name)
+        print(f"Model saved to {model_name}")
+
+    def load_model(self, model_name='model.pkl'):
+        self.model = joblib.load(model_name)
+        print(f"Model loaded from {model_name}")
 
     def train_xgboost_model(self):
         from xgboost import XGBClassifier
@@ -136,55 +201,67 @@ class EagleEye:
         le = LabelEncoder()
         return le.fit_transform(y)
     
-    def get_accuracy_metrics(self, y, y_pred):
+    def get_accuracy_metrics(self, y_true, y_pred):
         from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-        accuracy = accuracy_score(y, y_pred)
-        precision = precision_score(y, y_pred, average='weighted')
-        recall = recall_score(y, y_pred, average='weighted')
-        f1 = f1_score(y, y_pred, average='weighted')
-        #classification_report = classification_report( y, y_pred )
+        accuracy = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, average='weighted')
+        recall = recall_score(y_true, y_pred, average='weighted')
+        f1 = f1_score(y_true, y_pred, average='weighted')
+        class_report = classification_report(y_true, y_pred, target_names=[
+            'acoustic', 'alternative', 'blues', 'children', 'classical', 'country', 'electronic', 'folk',
+            'funk', 'hip-hop', 'jazz', 'latin', 'metal', 'miscellaneous', 'pop', 'punk', 'r&b', 'reggae',
+            'regional', 'religious', 'rock', 'world'
+        ])
 
         return {
             "accuracy": accuracy,
             "precision": precision,
             "recall": recall,
             "f1": f1,
-#            "classification_report": classification_report, 
+            "classification_report": class_report,  # Include the classification report as a string
         }
 
-    def evaluate_model(self):
+    def evaluate_model(self, calculate_feature_importance=True):
         print("Evaluating model...")
         print("Making predictions...")
-        self.y_pred_test = self.predict(self.X_test)
-        self.y_pred_train = self.predict(self.X_train)
+        self.y_pred_test = self.model.predict(self.X_test)
+        self.y_pred_train = self.model.predict(self.X_train)
         print("Getting accuracy metrics...")
 
-        evaluation = { "Test Data Scores": self.get_accuracy_metrics(self.y_test, self.y_pred_test), "Train Data Scores": self.get_accuracy_metrics(self.y_train, self.y_pred_train)}
-        print(f"--- Test Data Scores ---\n {evaluation["Test Data Scores"]}")
-        print(f"--- Train Data Scores ---\n {evaluation["Train Data Scores"]}")
+        evaluation = {
+            "Test Data Scores": self.get_accuracy_metrics(self.y_test, self.y_pred_test),
+            "Train Data Scores": self.get_accuracy_metrics(self.y_train, self.y_pred_train)
+        }
 
-    def plot_roc_curve(self):
-        plt.plot(self.fpr, self.tpr, marker='.')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('ROC Curve')
-        plt.show()
+        if calculate_feature_importance:
+            # Get feature importances
+            if isinstance(self.model, RandomForestClassifier):
+                feature_importances = self.model.feature_importances_
+                importance_df = pd.DataFrame({
+                    'Feature': self.X_train.columns,
+                    'Importance': feature_importances
+                })
+                importance_df = importance_df.sort_values(by='Importance', ascending=False)
+                print("--- Feature Importances ---")
+                print(importance_df)
+                print("---\n")
+            else:
+                print("Feature importance is only available for RandomForestClassifier.")
 
-    def get_accuracy(self):
-        return self.accuracy
+        print("--- Test Data Scores ---")
+        for key, value in evaluation["Test Data Scores"].items():
+            if key == "classification_report":
+                print(f"{key}:\n{value}\n")
+            else:
+                print(f"{key}: {value}")
+        print("---\n")
+
+        print("--- Train Data Scores ---")
+        for key, value in evaluation["Train Data Scores"].items():
+            if key == "classification_report":
+                print(f"{key}:\n{value}\n")
+            else:
+                print(f"{key}: {value}")
+        print("---\n")
     
-    def get_cross_val_score(self):
-        return self.cross_val_score
-    
-    def get_classification_report(self):
-        return self.classification_report
-    
-    def get_confusion_matrix(self):
-        return self.confusion_matrix
-    
-    def get_roc_auc_score(self):
-        return self.roc_auc_score
-    
-    def get_roc_curve(self):
-        return self.fpr, self.tpr, self.thresholds
-        
+
