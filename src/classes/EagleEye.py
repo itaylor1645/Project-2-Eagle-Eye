@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.metrics import classification_report
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
