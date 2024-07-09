@@ -129,13 +129,15 @@ class EagleEye:
     def train_randomforest_model(self, perform_random_search=True, retrain_model=True):
         # Load model if it is already trained and exists
         if not retrain_model and os.path.exists('model.pkl') and not perform_random_search:
-            self.model = joblib.load('model.pkl')
-            print("Model loaded from model.pkl")
+            self.load_model('model.pkl')
         else:
+            # Train a new model
+            print("Training Random Forest model...")
             self.model = RandomForestClassifier()
 
             # Perform RandomizedSearchCV to find the best hyperparameters
             if perform_random_search:
+                
                 param_dist = {
                     'n_estimators': [100, 200, 300],
                     'max_depth': [None, 10, 20, 30],
@@ -151,18 +153,23 @@ class EagleEye:
                 self.model = random_search.best_estimator_
                 best_params = random_search.best_params_
                 print(f"Best Params: {best_params}")
-                joblib.dump(self.model, 'model.pkl')
-                print("Model saved to model.pkl")
 
-            # Train with default parameters if RandomizedSearchCV is disabled
             else:
-                # Train with default parameters
+                
+                # Train with default parameters if RandomizedSearchCV is disabled
                 print("Training model...")
                 self.model.fit(self.X_train, self.y_train)
 
-                # Save the model to disk as model.pkl so that we dont have to train it upon every run. 
-                joblib.dump(self.model, 'model.pkl')
-                print("Default model trained and saved to model.pkl")
+            # Save the model to disk as model.pkl so that we dont have to train it upon every run. 
+            self.save_model("model.pkl")
+
+    def save_model(self, model_name='model.pkl'):
+        joblib.dump(self.model, model_name)
+        print(f"Model saved to {model_name}")
+
+    def load_model(self, model_name='model.pkl'):
+        self.model = joblib.load(model_name)
+        print(f"Model loaded from {model_name}")
 
     def train_xgboost_model(self):
         from xgboost import XGBClassifier
@@ -257,29 +264,5 @@ class EagleEye:
             else:
                 print(f"{key}: {value}")
         print("---\n")
+    
 
-    def plot_roc_curve(self):
-        plt.plot(self.fpr, self.tpr, marker='.')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('ROC Curve')
-        plt.show()
-
-    def get_accuracy(self):
-        return self.accuracy
-    
-    def get_cross_val_score(self):
-        return self.cross_val_score
-    
-    def get_classification_report(self):
-        return self.classification_report
-    
-    def get_confusion_matrix(self):
-        return self.confusion_matrix
-    
-    def get_roc_auc_score(self):
-        return self.roc_auc_score
-    
-    def get_roc_curve(self):
-        return self.fpr, self.tpr, self.thresholds
-    
